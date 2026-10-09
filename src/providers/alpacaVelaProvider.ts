@@ -15,6 +15,13 @@ type SymbolDescriptor = {
   prefix?: string;
 };
 
+function defaultLimit(timeframe: string, requested?: number): number {
+  if (requested != null && Number.isFinite(requested)) {
+    return Math.min(Math.max(requested, 1), 10000);
+  }
+  return isMinuteLike(timeframe) ? 500 : 200;
+}
+
 /**
  * Vela DataProvider that pulls US equity bars from our Next.js /api/bars
  * (Alpaca IEX on the server). No Alpaca keys in the browser.
@@ -32,15 +39,18 @@ export function createAlpacaVelaProvider(watchlist: string[] = ["AAPL"]) {
     range: BarRange,
   ): Promise<ChartBar[]> {
     const alpacaTf = toAlpacaTimeframe(timeframe);
-    const limit = Math.min(Math.max(range.limit ?? 200, 1), 10000);
+    const limit = defaultLimit(timeframe, range.limit);
     const qs = new URLSearchParams({
       symbol: ticker,
       timeframe: alpacaTf,
       limit: String(limit),
       feed: "iex",
     });
-    if (range.from) qs.set("start", new Date(range.from).toISOString());
-    if (range.to) qs.set("end", new Date(range.to).toISOString());
+    // Only forward an explicit from/to when the chart is paging history.
+    // For the initial "most recent N bars" load, omit start/end so the
+    // server applies its Alpaca-safe default window (IEX needs `start`).
+    if (range.from != null) qs.set("start", new Date(range.from).toISOString());
+    if (range.to != null) qs.set("end", new Date(range.to).toISOString());
 
     const res = await fetch(`/api/bars?${qs.toString()}`, { cache: "no-store" });
     const json = (await res.json()) as { bars?: ChartBar[]; error?: string };
@@ -109,6 +119,5 @@ export function createAlpacaVelaProvider(watchlist: string[] = ["AAPL"]) {
         pollTimers.delete(key);
       };
     },
-
   };
 }

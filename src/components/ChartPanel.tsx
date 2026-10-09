@@ -37,7 +37,8 @@ export default function ChartPanel({ symbol, timeframe, watchlist }: Props) {
           timeframe: toVelaTimeframe(timeframe),
           theme: "dark",
           live: true,
-          bars: 200,
+          // Enough for a full RTH minute session; daily also benefits from deeper history.
+          bars: 500,
         });
         chart.data.registerProvider("alpaca", provider);
         chartRef.current = chart;
